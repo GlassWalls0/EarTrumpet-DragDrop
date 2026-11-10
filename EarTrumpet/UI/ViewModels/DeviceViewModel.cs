@@ -1,0 +1,430 @@
+using EarTrumpet.DataModel.Audio;
+using EarTrumpet.DataModel.WindowsAudio;
+using EarTrumpet.Extensions;
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.Linq;
+using GongSolutions.Wpf.DragDrop;
+
+namespace EarTrumpet.UI.ViewModels
+{
+    public class DeviceViewModel : AudioSessionViewModel, IDeviceViewModel, IDropTarget
+    {
+        public class DisplayNameComparer : IComparer<DeviceViewModel>
+        {
+            public int Compare(DeviceViewModel one, DeviceViewModel two)
+            {
+                return string.Compare(one.DisplayName, two.DisplayName, StringComparison.CurrentCultureIgnoreCase);
+            }
+        }
+
+        public static readonly DisplayNameComparer CompareByDisplayName = new DisplayNameComparer();
+
+        public enum DeviceIconKind
+        {
+            Mute,
+            Bar0,
+            Bar1,
+            Bar2,
+            Bar3,
+            Microphone,
+        }
+
+        public string DisplayName => _device.DisplayName;
+        public string AccessibleName => IsMuted ? Properties.Resources.AppOrDeviceMutedFormatAccessibleText.Replace("{Name}", DisplayName) :
+            Properties.Resources.AppOrDeviceFormatAccessibleText.Replace("{Name}", DisplayName).Replace("{Volume}", Volume.ToString());
+        public string DeviceDescription => ((IAudioDeviceWindowsAudio)_device).DeviceDescription;
+        public string EnumeratorName => ((IAudioDeviceWindowsAudio)_device).EnumeratorName;
+        public string InterfaceName => ((IAudioDeviceWindowsAudio)_device).InterfaceName;
+        public ObservableCollection<IAppItemViewModel> Apps { get; }
+
+        private static DeviceViewModel s_dropTarget;
+
+        private bool _isDropTargetActive;
+        public bool IsDropTargetActive
+        {
+            get => _isDropTargetActive;
+            private set
+            {
+                if (_isDropTargetActive != value)
+                {
+                    _isDropTargetActive = value;
+                    RaisePropertyChanged(nameof(IsDropTargetActive));
+                }
+            }
+        }
+
+        private bool _isDragInProgress;
+        /// <summary>True for every device while an app is being dragged, used to dim the ones that cannot accept it.</summary>
+        public bool IsDragInProgress
+        {
+            get => _isDragInProgress;
+            private set
+            {
+                if (_isDragInProgress != value)
+                {
+                    _isDragInProgress = value;
+                    RaisePropertyChanged(nameof(IsDragInProgress));
+                }
+            }
+        }
+
+        private static readonly List<WeakReference<DeviceViewModel>> s_allDevices = new List<WeakReference<DeviceViewModel>>();
+
+        private static void SetDragInProgress(bool value)
+        {
+            foreach (var weakDevice in s_allDevices.ToArray())
+            {
+                if (weakDevice.TryGetTarget(out DeviceViewModel device))
+                {
+                    device.IsDragInProgress = value;
+                }
+                else
+                {
+                    s_allDevices.Remove(weakDevice);
+                }
+            }
+        }
+
+        private static void SetDropTarget(DeviceViewModel target)
+        {
+            if (ReferenceEquals(s_dropTarget, target))
+            {
+                return;
+            }
+
+            if (s_dropTarget != null)
+            {
+                s_dropTarget.IsDropTargetActive = false;
+            }
+
+            s_dropTarget = target;
+
+            if (target != null)
+            {
+                target.IsDropTargetActive = true;
+            }
+        }
+
+        internal static void ClearDropTarget()
+        {
+            SetDropTarget(null);
+            SetDragInProgress(false);
+        }
+
+        public bool IsDisplayNameVisible
+        {
+            get => _isDisplayNameVisible;
+            set
+            {
+                if (_isDisplayNameVisible != value)
+                {
+                    _isDisplayNameVisible = value;
+                    RaisePropertyChanged(nameof(IsDisplayNameVisible));
+                }
+            }
+        }
+
+        public DeviceIconKind IconKind
+        {
+            get => _iconKind;
+            set
+            {
+                if (_iconKind != value)
+                {
+                    _iconKind = value;
+                    RaisePropertyChanged(nameof(IconKind));
+                }
+            }
+        }
+
+        protected readonly IAudioDevice _device;
+        protected readonly IAudioDeviceManager _deviceManager;
+        protected readonly WeakReference<DeviceCollectionViewModel> _parent;
+        private bool _isDisplayNameVisible;
+        private DeviceIconKind _iconKind;
+
+        public DeviceViewModel(DeviceCollectionViewModel parent, IAudioDeviceManager deviceManager, IAudioDevice device) : base(device)
+        {
+            _deviceManager = deviceManager;
+            _device = device;
+            _parent = new WeakReference<DeviceCollectionViewModel>(parent);
+            Apps = new ObservableCollection<IAppItemViewModel>();
+
+            s_allDevices.Add(new WeakReference<DeviceViewModel>(this));
+
+            _device.PropertyChanged += OnPropertyChanged;
+            _device.Groups.CollectionChanged += OnCollectionChanged;
+
+            foreach (var session in _device.Groups)
+            {
+                Apps.AddSorted(new AppItemViewModel(this, session), AppItemViewModel.CompareByExeName);
+            }
+
+            UpdateMasterVolumeIcon();
+        }
+
+        ~DeviceViewModel()
+        {
+            _device.PropertyChanged -= OnPropertyChanged;
+            _device.Groups.CollectionChanged -= OnCollectionChanged;
+        }
+
+        private void OnPropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(_device.IsMuted) ||
+                e.PropertyName == nameof(_device.Volume))
+            {
+                UpdateMasterVolumeIcon();
+                RaisePropertyChanged(nameof(AccessibleName));
+            }
+            else if (e.PropertyName == nameof(_device.DisplayName))
+            {
+                RaisePropertyChanged(nameof(DisplayName));
+                RaisePropertyChanged(nameof(AccessibleName));
+            }
+        }
+
+        public override void UpdatePeakValueForeground()
+        {
+            base.UpdatePeakValueForeground();
+
+            foreach (var app in Apps)
+            {
+                app.UpdatePeakValueForeground();
+            }
+        }
+
+        private void UpdateMasterVolumeIcon()
+        {
+            if (_device.Parent.Kind == AudioDeviceKind.Recording.ToString())
+            {
+                IconKind = DeviceIconKind.Microphone;
+            }
+            else
+            {
+                var isOnWindows11 = Environment.OSVersion.IsAtLeast(OSVersions.Windows11);
+                if (_device.IsMuted)
+                {
+                    IconKind = DeviceIconKind.Mute;
+                }
+                else if (isOnWindows11 && _device.Volume > 0.66f)
+                {
+                    IconKind = DeviceIconKind.Bar3;
+                }
+                else if (!isOnWindows11 && _device.Volume >= 0.66f)
+                {
+                    IconKind = DeviceIconKind.Bar3;
+                }
+                else if (isOnWindows11 && _device.Volume > 0.33f)
+                {
+                    IconKind = DeviceIconKind.Bar2;
+                }
+                else if (!isOnWindows11 && _device.Volume >= 0.33f)
+                {
+                    IconKind = DeviceIconKind.Bar2;
+                }
+                else if (_device.Volume > 0.00f)
+                {
+                    IconKind = DeviceIconKind.Bar1;
+                }
+                else
+                {
+                    IconKind = DeviceIconKind.Bar0;
+                }
+            }
+        }
+
+        private void OnCollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        {
+            switch (e.Action)
+            {
+                case System.Collections.Specialized.NotifyCollectionChangedAction.Add:
+                    Debug.Assert(e.NewItems.Count == 1);
+                    AddSession((IAudioDeviceSession)e.NewItems[0]);
+                    break;
+
+                case System.Collections.Specialized.NotifyCollectionChangedAction.Remove:
+                    Debug.Assert(e.OldItems.Count == 1);
+                    var existing = Apps.FirstOrDefault(x => x.Id == ((IAudioDeviceSession)e.OldItems[0]).Id);
+                    if (existing != null)
+                    {
+                        Apps.Remove(existing);
+                    }
+                    break;
+
+                default:
+                    throw new NotImplementedException();
+            }
+        }
+
+        private void AddSession(IAudioDeviceSession session)
+        {
+            var newSession = new AppItemViewModel(this, session);
+
+            foreach (var app in Apps)
+            {
+                if (app.DoesGroupWith(newSession))
+                {
+                    // Remove the fake app entry after copying any changes the user did.
+                    newSession.Volume = app.Volume;
+                    newSession.IsMuted = app.IsMuted;
+                    Apps.Remove(app);
+                    break;
+                }
+            }
+
+            Apps.AddSorted(newSession, AppItemViewModel.CompareByExeName);
+        }
+
+        public void AppMovingToThisDevice(TemporaryAppItemViewModel app)
+        {
+            app.Expired += OnAppExpired;
+
+            foreach (var childApp in app.ChildApps)
+            {
+                ((IAudioDeviceManagerWindowsAudio)_deviceManager).UnhideSessionsForProcessId(_device.Id, childApp.ProcessId);
+            }
+
+            bool hasExistingAppGroup = false;
+            foreach (var a in Apps)
+            {
+                if (a.DoesGroupWith(app))
+                {
+                    hasExistingAppGroup = true;
+                    break;
+                }
+            }
+
+            if (!hasExistingAppGroup)
+            {
+                Apps.AddSorted(app, AppItemViewModel.CompareByExeName);
+            }
+        }
+
+        private void OnAppExpired(object sender, EventArgs e)
+        {
+            var app = (TemporaryAppItemViewModel)sender;
+            if (Apps.Contains(app))
+            {
+                app.Expired -= OnAppExpired;
+                Apps.Remove(app);
+            }
+        }
+
+        internal void AppLeavingFromThisDevice(IAppItemViewModel app)
+        {
+            if (app is TemporaryAppItemViewModel)
+            {
+                Apps.Remove(app);
+            }
+        }
+
+        public void MakeDefaultDevice() => _deviceManager.Default = _device;
+        public void IncrementVolume(int delta) => Volume += delta;
+        public override string ToString() => AccessibleName;
+
+        void IDropTarget.DragEnter(IDropInfo dropInfo)
+        {
+        }
+
+        void IDropTarget.DragOver(IDropInfo dropInfo)
+        {
+            DragOver(dropInfo);
+        }
+
+        public static void DragOver(IDropInfo dropInfo)
+        {
+            IAppItemViewModel sourceApp = GetDragSourceApp(dropInfo);
+            DeviceViewModel targetDevice = GetDropTargetDevice(dropInfo);
+
+            if (sourceApp == null)
+            {
+                ClearDropTarget();
+                dropInfo.DropTargetAdorner = null;
+                dropInfo.Effects = System.Windows.DragDropEffects.None;
+                return;
+            }
+
+            SetDragInProgress(true);
+
+            DeviceViewModel currentAppDevice = sourceApp.Parent as DeviceViewModel;
+
+            if (targetDevice == null || currentAppDevice == targetDevice)
+            {
+                SetDropTarget(null);
+                dropInfo.DropTargetAdorner = null;
+                dropInfo.Effects = System.Windows.DragDropEffects.None;
+            }
+            else
+            {
+                // The highlight is drawn by DeviceView.xaml off IsDropTargetActive, so gong's adorner stays off.
+                SetDropTarget(targetDevice);
+                dropInfo.DropTargetAdorner = null;
+                dropInfo.Effects = System.Windows.DragDropEffects.Move;
+            }
+        }
+
+        void IDropTarget.DragLeave(IDropInfo dropInfo)
+        {
+            ClearDropTarget();
+        }
+
+        void IDropTarget.Drop(IDropInfo dropInfo)
+        {
+            Drop(dropInfo);
+        }
+
+        internal static void Drop(IDropInfo dropInfo)
+        {
+            ClearDropTarget();
+
+            IAppItemViewModel sourceApp = GetDragSourceApp(dropInfo);
+            if (sourceApp == null)
+            {
+                return;
+            }
+
+            DeviceViewModel targetDevice = GetDropTargetDevice(dropInfo);
+            if (targetDevice == null)
+            {
+                return;
+            }
+
+            DeviceViewModel currentAppDevice = sourceApp.Parent as DeviceViewModel;
+            if (currentAppDevice == targetDevice)
+            {
+                return;
+            }
+
+            if (targetDevice._parent.TryGetTarget(out DeviceCollectionViewModel deviceCollectionViewModel))
+            {
+                deviceCollectionViewModel.MoveAppToDevice(sourceApp, targetDevice);
+            }
+        }
+
+        private static IAppItemViewModel GetDragSourceApp(IDropInfo dropInfo)
+        {
+            return dropInfo.Data as IAppItemViewModel;
+        }
+
+        private static DeviceViewModel GetDropTargetDevice(IDropInfo dropInfo)
+        {
+            // Drop target can be a device itself.
+            if (dropInfo.TargetItem is DeviceViewModel targetDevice)
+            {
+                return targetDevice;
+            }
+
+            // Drop target can be an app inside a device.
+            if (dropInfo.TargetItem is AppItemViewModel targetApp && targetApp.Parent is DeviceViewModel targetAppParentDevice)
+            {
+                return targetAppParentDevice;
+            }
+
+            return null;
+        }
+    }
+}

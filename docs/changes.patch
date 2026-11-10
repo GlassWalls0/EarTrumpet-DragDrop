@@ -1,0 +1,257 @@
+diff --git a/EarTrumpet/packages.config b/EarTrumpet/packages.config
+index 668ac9d..b32aaaf 100644
+--- a/EarTrumpet/packages.config
++++ b/EarTrumpet/packages.config
+@@ -5,4 +5,5 @@
+   <package id="GitVersionTask" version="5.5.1" targetFramework="net462" developmentDependency="true" />
+   <package id="Newtonsoft.Json" version="13.0.2" targetFramework="net462" />
+   <package id="XamlAnimatedGif" version="2.1.0" targetFramework="net462" />
++  <package id="gong-wpf-dragdrop" version="3.1.1" targetFramework="net462" />
+ </packages>
+\ No newline at end of file
+diff --git a/EarTrumpet/EarTrumpet.csproj b/EarTrumpet/EarTrumpet.csproj
+index b4666b2..5fb3b94 100644
+--- a/EarTrumpet/EarTrumpet.csproj
++++ b/EarTrumpet/EarTrumpet.csproj
+@@ -1,4 +1,4 @@
+-?<?xml version="1.0" encoding="utf-8"?>
++<?xml version="1.0" encoding="utf-8"?>
+ <Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+   <Import Project="..\packages\GitVersionTask.5.5.1\build\GitVersionTask.props" Condition="Exists('..\packages\GitVersionTask.5.5.1\build\GitVersionTask.props')" />
+   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+@@ -51,6 +51,9 @@
+     <Reference Include="Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
+       <HintPath>..\packages\Newtonsoft.Json.13.0.2\lib\net45\Newtonsoft.Json.dll</HintPath>
+     </Reference>
++    <Reference Include="GongSolutions.WPF.DragDrop, Version=3.0.0.0, Culture=neutral, PublicKeyToken=91f1945125b7a587, processorArchitecture=MSIL">
++      <HintPath>..\packages\gong-wpf-dragdrop.3.1.1\lib\net462\GongSolutions.WPF.DragDrop.dll</HintPath>
++    </Reference>
+     <Reference Include="System" />
+     <Reference Include="System.ComponentModel.Composition" />
+     <Reference Include="System.Configuration" />
+@@ -66,6 +69,8 @@
+     <Reference Include="System.Xml" />
+     <Reference Include="Windows, Version=255.255.255.255, Culture=neutral, processorArchitecture=MSIL">
+       <SpecificVersion>False</SpecificVersion>
++      <Private>False</Private>
++      <HintPath Condition="'$(EarTrumpetWinMd)' != ''">$(EarTrumpetWinMd)</HintPath>
+       <HintPath Condition="Exists('$(MSBuildProgramFiles32)\Windows Kits\10\UnionMetadata\Windows.winmd')">$(MSBuildProgramFiles32)\Windows Kits\10\UnionMetadata\Windows.winmd</HintPath>
+       <HintPath Condition="Exists('$(MSBuildProgramFiles32)\Windows Kits\10\UnionMetadata\10.0.16299.0\Windows.winmd')">$(MSBuildProgramFiles32)\Windows Kits\10\UnionMetadata\10.0.16299.0\Windows.winmd</HintPath>
+     </Reference>
+diff --git a/EarTrumpet/Properties/AssemblyInfo.cs b/EarTrumpet/Properties/AssemblyInfo.cs
+index d117730..3892164 100644
+--- a/EarTrumpet/Properties/AssemblyInfo.cs
++++ b/EarTrumpet/Properties/AssemblyInfo.cs
+@@ -4,4 +4,7 @@ using System.Windows;
+ [assembly: AssemblyTitle("EarTrumpet")]
+ [assembly: AssemblyCompany("File-New-Project")]
+ [assembly: AssemblyProduct("EarTrumpet")]
++[assembly: AssemblyVersion("2.3.0.0")]
++[assembly: AssemblyFileVersion("2.3.0.0")]
++[assembly: AssemblyInformationalVersion("2.3.0.0+dragdrop")]
+ [assembly: ThemeInfo(ResourceDictionaryLocation.None, ResourceDictionaryLocation.SourceAssembly)]
+\ No newline at end of file
+diff --git a/EarTrumpet/UI/ViewModels/DeviceViewModel.cs b/EarTrumpet/UI/ViewModels/DeviceViewModel.cs
+index 3386cba..abcffff 100644
+--- a/EarTrumpet/UI/ViewModels/DeviceViewModel.cs
++++ b/EarTrumpet/UI/ViewModels/DeviceViewModel.cs
+@@ -6,10 +6,11 @@ using System.Collections.Generic;
+ using System.Collections.ObjectModel;
+ using System.Diagnostics;
+ using System.Linq;
++using GongSolutions.Wpf.DragDrop;
+ 
+ namespace EarTrumpet.UI.ViewModels
+ {
+-    public class DeviceViewModel : AudioSessionViewModel, IDeviceViewModel
++    public class DeviceViewModel : AudioSessionViewModel, IDeviceViewModel, IDropTarget
+     {
+         public class DisplayNameComparer : IComparer<DeviceViewModel>
+         {
+@@ -248,5 +249,90 @@ namespace EarTrumpet.UI.ViewModels
+         public void MakeDefaultDevice() => _deviceManager.Default = _device;
+         public void IncrementVolume(int delta) => Volume += delta;
+         public override string ToString() => AccessibleName;
++
++        void IDropTarget.DragEnter(IDropInfo dropInfo)
++        {
++        }
++
++        void IDropTarget.DragOver(IDropInfo dropInfo)
++        {
++            DragOver(dropInfo);
++        }
++
++        public static void DragOver(IDropInfo dropInfo)
++        {
++            IAppItemViewModel sourceApp = GetDragSourceApp(dropInfo);
++            DeviceViewModel targetDevice = GetDropTargetDevice(dropInfo);
++
++            DeviceViewModel currentAppDevice = sourceApp?.Parent as DeviceViewModel;
++
++            if (targetDevice == null || sourceApp == null || currentAppDevice == targetDevice)
++            {
++                dropInfo.DropTargetAdorner = null;
++                dropInfo.Effects = System.Windows.DragDropEffects.None;
++            }
++            else
++            {
++                dropInfo.DropTargetAdorner = DropTargetAdorners.Highlight;
++                dropInfo.Effects = System.Windows.DragDropEffects.Move;
++            }
++        }
++
++        void IDropTarget.DragLeave(IDropInfo dropInfo)
++        {
++        }
++
++        void IDropTarget.Drop(IDropInfo dropInfo)
++        {
++            Drop(dropInfo);
++        }
++
++        internal static void Drop(IDropInfo dropInfo)
++        {
++            IAppItemViewModel sourceApp = GetDragSourceApp(dropInfo);
++            if (sourceApp == null)
++            {
++                return;
++            }
++
++            DeviceViewModel targetDevice = GetDropTargetDevice(dropInfo);
++            if (targetDevice == null)
++            {
++                return;
++            }
++
++            DeviceViewModel currentAppDevice = sourceApp.Parent as DeviceViewModel;
++            if (currentAppDevice == targetDevice)
++            {
++                return;
++            }
++
++            if (targetDevice._parent.TryGetTarget(out DeviceCollectionViewModel deviceCollectionViewModel))
++            {
++                deviceCollectionViewModel.MoveAppToDevice(sourceApp, targetDevice);
++            }
++        }
++
++        private static IAppItemViewModel GetDragSourceApp(IDropInfo dropInfo)
++        {
++            return dropInfo.Data as IAppItemViewModel;
++        }
++
++        private static DeviceViewModel GetDropTargetDevice(IDropInfo dropInfo)
++        {
++            // Drop target can be a device itself.
++            if (dropInfo.TargetItem is DeviceViewModel targetDevice)
++            {
++                return targetDevice;
++            }
++
++            // Drop target can be an app inside a device.
++            if (dropInfo.TargetItem is AppItemViewModel targetApp && targetApp.Parent is DeviceViewModel targetAppParentDevice)
++            {
++                return targetAppParentDevice;
++            }
++
++            return null;
++        }
+     }
+ }
+diff --git a/EarTrumpet/UI/ViewModels/FlyoutViewModel.cs b/EarTrumpet/UI/ViewModels/FlyoutViewModel.cs
+index 50d66d5..914058e 100644
+--- a/EarTrumpet/UI/ViewModels/FlyoutViewModel.cs
++++ b/EarTrumpet/UI/ViewModels/FlyoutViewModel.cs
+@@ -8,10 +8,11 @@ using System.Linq;
+ using System.Windows;
+ using System.Windows.Input;
+ using System.Windows.Threading;
++using GongSolutions.Wpf.DragDrop;
+ 
+ namespace EarTrumpet.UI.ViewModels
+ {
+-    public class FlyoutViewModel : BindableBase, IPopupHostViewModel, IFlyoutViewModel
++    public class FlyoutViewModel : BindableBase, IPopupHostViewModel, IFlyoutViewModel, IDropTarget
+     {
+         public event EventHandler<object> WindowSizeInvalidated;
+         public event EventHandler<object> StateChanged;
+@@ -412,5 +413,23 @@ namespace EarTrumpet.UI.ViewModels
+             Dialog.IsVisible = false;
+             e.Handled = true;
+         }
++
++        void IDropTarget.DragEnter(IDropInfo dropInfo)
++        {
++        }
++
++        void IDropTarget.DragOver(IDropInfo dropInfo)
++        {
++            DeviceViewModel.DragOver(dropInfo);
++        }
++
++        void IDropTarget.DragLeave(IDropInfo dropInfo)
++        {
++        }
++
++        void IDropTarget.Drop(IDropInfo dropInfo)
++        {
++            DeviceViewModel.Drop(dropInfo);
++        }
+     }
+ }
+diff --git a/EarTrumpet/UI/Views/DeviceView.xaml b/EarTrumpet/UI/Views/DeviceView.xaml
+index 852d6c8..f8ffeb8 100644
+--- a/EarTrumpet/UI/Views/DeviceView.xaml
++++ b/EarTrumpet/UI/Views/DeviceView.xaml
+@@ -6,6 +6,7 @@
+              xmlns:local="clr-namespace:EarTrumpet"
+              xmlns:resx="clr-namespace:EarTrumpet.Properties"
+              xmlns:views="clr-namespace:EarTrumpet.UI.Views"
++             xmlns:dd="urn:gong-wpf-dragdrop"
+              IsTabStop="False">
+     <Grid Name="GridRoot">
+         <Grid.RowDefinitions>
+@@ -143,7 +144,18 @@
+             <ListView Name="AppList"
+                       Margin="{StaticResource VolumeAppListMargin}"
+                       AutomationProperties.Name="{x:Static resx:Resources.AppsListAccessibleText}"
+-                      ItemsSource="{Binding Device.Apps, Mode=OneWay}" />
++                      ItemsSource="{Binding Device.Apps, Mode=OneWay}"
++                      dd:DragDrop.IsDragSource="True">
++                <dd:DragDrop.DragAdornerTemplate>
++                    <DataTemplate>
++                        <ctl:ImageEx x:Name="AppIcon"
++                                 Width="{DynamicResource Mutable_AppIconSize}"
++                                 Height="{DynamicResource Mutable_AppIconSize}"
++                                 SourceEx="{Binding}"
++                                 Stretch="Fill" />
++                    </DataTemplate>
++                </dd:DragDrop.DragAdornerTemplate>
++            </ListView>
+         </Border>
+     </Grid>
+ </UserControl>
+diff --git a/EarTrumpet/UI/Views/FlyoutWindow.xaml b/EarTrumpet/UI/Views/FlyoutWindow.xaml
+index 3c5272b..cb2570c 100644
+--- a/EarTrumpet/UI/Views/FlyoutWindow.xaml
++++ b/EarTrumpet/UI/Views/FlyoutWindow.xaml
+@@ -8,6 +8,7 @@
+         xmlns:resx="clr-namespace:EarTrumpet.Properties"
+         xmlns:views="clr-namespace:EarTrumpet.UI.Views"
+         xmlns:vm="clr-namespace:EarTrumpet.UI.ViewModels"
++        xmlns:dd="urn:gong-wpf-dragdrop"
+         Title="EarTrumpet"
+         Width="{StaticResource WindowAndItemSize}"
+         Theme:Brush.Foreground="Text"
+@@ -126,7 +127,9 @@
+                     <ItemsControl Name="DevicesList"
+                                   FocusVisualStyle="{x:Null}"
+                                   IsTabStop="False"
+-                                  ItemsSource="{Binding Devices}" />
++                                  ItemsSource="{Binding Devices}"
++                                  dd:DragDrop.IsDropTarget="True"
++                                  dd:DragDrop.DropHandler="{Binding}" />
+                     <Button Height="{DynamicResource Mutable_DeviceTitleCellHeight}"
+                             Command="{Binding ExpandCollapse}"
+                             IsEnabled="{Binding CanExpand}">
