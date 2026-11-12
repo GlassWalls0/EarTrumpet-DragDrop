@@ -73,12 +73,88 @@ public class DeviceViewModel : AudioSessionViewModel, IDeviceViewModel, IDropTar
     private bool _isDisplayNameVisible;
     private DeviceIconKind _iconKind;
 
+    private static DeviceViewModel s_dropTarget;
+    private static readonly List<WeakReference<DeviceViewModel>> s_allDevices = [];
+
+    private bool _isDropTargetActive;
+    /// <summary>True for the device the dragged app is currently hovering over.</summary>
+    public bool IsDropTargetActive
+    {
+        get => _isDropTargetActive;
+        private set
+        {
+            if (_isDropTargetActive != value)
+            {
+                _isDropTargetActive = value;
+                RaisePropertyChanged(nameof(IsDropTargetActive));
+            }
+        }
+    }
+
+    private bool _isDragInProgress;
+    /// <summary>True for every device while an app is being dragged, used to dim the ones that cannot accept it.</summary>
+    public bool IsDragInProgress
+    {
+        get => _isDragInProgress;
+        private set
+        {
+            if (_isDragInProgress != value)
+            {
+                _isDragInProgress = value;
+                RaisePropertyChanged(nameof(IsDragInProgress));
+            }
+        }
+    }
+
+    private static void SetDragInProgress(bool value)
+    {
+        foreach (var weakDevice in s_allDevices.ToArray())
+        {
+            if (weakDevice.TryGetTarget(out DeviceViewModel device))
+            {
+                device.IsDragInProgress = value;
+            }
+            else
+            {
+                s_allDevices.Remove(weakDevice);
+            }
+        }
+    }
+
+    private static void SetDropTarget(DeviceViewModel target)
+    {
+        if (ReferenceEquals(s_dropTarget, target))
+        {
+            return;
+        }
+
+        if (s_dropTarget != null)
+        {
+            s_dropTarget.IsDropTargetActive = false;
+        }
+
+        s_dropTarget = target;
+
+        if (target != null)
+        {
+            target.IsDropTargetActive = true;
+        }
+    }
+
+    internal static void ClearDropTarget()
+    {
+        SetDropTarget(null);
+        SetDragInProgress(false);
+    }
+
     public DeviceViewModel(DeviceCollectionViewModel parent, IAudioDeviceManager deviceManager, IAudioDevice device) : base(device)
     {
         _deviceManager = deviceManager;
         _device = device;
         _parent = new WeakReference<DeviceCollectionViewModel>(parent);
         Apps = [];
+
+        s_allDevices.Add(new WeakReference<DeviceViewModel>(this));
 
         _device.PropertyChanged += OnPropertyChanged;
         _device.Groups.CollectionChanged += OnCollectionChanged;
@@ -287,22 +363,37 @@ public class DeviceViewModel : AudioSessionViewModel, IDeviceViewModel, IDropTar
     {
         IAppItemViewModel sourceApp = GetDragSourceApp(dropInfo);
         DeviceViewModel targetDevice = GetDropTargetDevice(dropInfo);
-        DeviceViewModel currentAppDevice = sourceApp?.Parent as DeviceViewModel;
 
-        if (targetDevice == null || sourceApp == null || currentAppDevice == targetDevice)
+        if (sourceApp == null)
         {
+            ClearDropTarget();
+            dropInfo.DropTargetAdorner = null;
+            dropInfo.Effects = System.Windows.DragDropEffects.None;
+            return;
+        }
+
+        SetDragInProgress(true);
+
+        DeviceViewModel currentAppDevice = sourceApp.Parent as DeviceViewModel;
+
+        if (targetDevice == null || currentAppDevice == targetDevice)
+        {
+            SetDropTarget(null);
             dropInfo.DropTargetAdorner = null;
             dropInfo.Effects = System.Windows.DragDropEffects.None;
         }
         else
         {
-            dropInfo.DropTargetAdorner = DropTargetAdorners.Highlight;
+            // The highlight is drawn by DeviceView.xaml off IsDropTargetActive, so gong's adorner stays off.
+            SetDropTarget(targetDevice);
+            dropInfo.DropTargetAdorner = null;
             dropInfo.Effects = System.Windows.DragDropEffects.Move;
         }
     }
 
     void IDropTarget.DragLeave(IDropInfo dropInfo)
     {
+        ClearDropTarget();
     }
 
     void IDropTarget.Drop(IDropInfo dropInfo)
@@ -312,6 +403,8 @@ public class DeviceViewModel : AudioSessionViewModel, IDeviceViewModel, IDropTar
 
     internal static void Drop(IDropInfo dropInfo)
     {
+        ClearDropTarget();
+
         IAppItemViewModel sourceApp = GetDragSourceApp(dropInfo);
         if (sourceApp == null)
         {

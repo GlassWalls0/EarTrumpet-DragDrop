@@ -685,4 +685,79 @@
   <data name="VolumeUnit_Decibel" xml:space="preserve">
     <value>分贝</value>
   </data>
+  <data name="SettingsUseScrollWheelInSliders" xml:space="preserve">
+    <value>鼠标指针悬停在音量滑块上时，使用滚轮调节音量</value>
+  </data>
+  <data name="SettingsVolumeStepAmount" xml:space="preserve">
+    <value>音量步进值</value>
+  </data>
+  <data name="SettingsUseRangeSnapping" xml:space="preserve">
+    <value>滚轮按音量步进值对齐</value>
+  </data>
+  <data name="SettingsUseSliderSnap" xml:space="preserve">
+    <value>拖动时滑块按音量步进值对齐</value>
+  </data>
+  <data name="GeneralSettingsPageText" xml:space="preserve">
+    <value>常规</value>
+  </data>
+  <data name="SettingsSectionVolume" xml:space="preserve">
+    <value>音量</value>
+  </data>
+  <data name="SettingsSectionMouse" xml:space="preserve">
+    <value>鼠标</value>
+  </data>
+  <data name="SettingsSectionAppearance" xml:space="preserve">
+    <value>外观</value>
+  </data>
+  <data name="SettingsSectionStartup" xml:space="preserve">
+    <value>启动</value>
+  </data>
+  <data name="SettingsUseLogarithmicVolumeDescription" xml:space="preserve">
+    <value>按人耳感知的响度调节音量，而不是线性的 0-100 刻度</value>
+  </data>
+  <data name="SettingsLogarithmicScaleMinimumDescription" xml:space="preserve">
+    <value>对数刻度上显示的最低音量</value>
+  </data>
+  <data name="SettingsVolumeStepAmountDescription" xml:space="preserve">
+    <value>每次滚动滚轮或按快捷键时音量变化的幅度</value>
+  </data>
+  <data name="SettingsUseRangeSnappingDescription" xml:space="preserve">
+    <value>滚动时直接对齐到步进刻度，而不是在当前音量上叠加</value>
+  </data>
+  <data name="SettingsUseSliderSnapDescription" xml:space="preserve">
+    <value>拖动时滑块在相邻步进值之间跳转</value>
+  </data>
+  <data name="SettingsUseScrollWheelInTrayDescription" xml:space="preserve">
+    <value>鼠标指针悬停在托盘图标上时，滚动滚轮调节默认设备的音量</value>
+  </data>
+  <data name="SettingsUseGlobalMouseWheelHookDescription" xml:space="preserve">
+    <value>浮窗打开时，在屏幕任意位置滚动滚轮均可调节音量</value>
+  </data>
+  <data name="SettingsUseScrollWheelInSlidersDescription" xml:space="preserve">
+    <value>在浮窗或音量合成器的滑块上滚动滚轮，调节该项音量</value>
+  </data>
+  <data name="SettingsUseLegacyEarTrumpetIconDescription" xml:space="preserve">
+    <value>显示 EarTrumpet 原始的托盘图标</value>
+  </data>
+  <data name="SettingsShowFullMixerWindowOnStartupDescription" xml:space="preserve">
+    <value>每次启动 EarTrumpet 时都打开完整的音量合成器窗口</value>
+  </data>
+  <data name="SettingsUseTranslucentWindows" xml:space="preserve">
+    <value>半透明窗口</value>
+  </data>
+  <data name="SettingsUseTranslucentWindowsDescription" xml:space="preserve">
+    <value>模糊浮窗和设置界面的背景。关闭后为不透明窗口，且需要开启 Windows 透明效果</value>
+  </data>
+  <data name="DeveloperOptionsMenuText" xml:space="preserve">
+    <value>开发者选项</value>
+  </data>
+  <data name="DeveloperRemoveAllDevicesText" xml:space="preserve">
+    <value>移除所有设备</value>
+  </data>
+  <data name="DeveloperAddMockDeviceText" xml:space="preserve">
+    <value>添加模拟设备</value>
+  </data>
+  <data name="DeveloperRestoreRealDevicesText" xml:space="preserve">
+    <value>恢复真实设备</value>
+  </data>
 </root>

@@ -429,6 +429,7 @@ public class FlyoutViewModel : BindableBase, IPopupHostViewModel, IFlyoutViewMod
 
     void IDropTarget.DragLeave(IDropInfo dropInfo)
     {
+        DeviceViewModel.ClearDropTarget();
     }
 
     void IDropTarget.Drop(IDropInfo dropInfo)

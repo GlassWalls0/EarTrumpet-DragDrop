@@ -12,11 +12,40 @@
     <UserControl.Resources>
         <conv:VolumeToStringConverter x:Key="VolumeToStringConverter"/>
     </UserControl.Resources>
-    <Grid Name="GridRoot">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
+    <Grid>
+        <Grid Name="GridRoot">
+            <Grid.Style>
+                <Style TargetType="Grid">
+                    <Style.Triggers>
+                        <!-- 拖拽进行中、但还没拖到本设备上：淡出，突出可放置的目标 -->
+                        <MultiDataTrigger>
+                            <MultiDataTrigger.Conditions>
+                                <Condition Binding="{Binding IsDragInProgress}" Value="True" />
+                                <Condition Binding="{Binding IsDropTargetActive}" Value="False" />
+                            </MultiDataTrigger.Conditions>
+                            <MultiDataTrigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetProperty="Opacity" To="0.55" Duration="0:0:0.12" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </MultiDataTrigger.EnterActions>
+                            <MultiDataTrigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.15" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </MultiDataTrigger.ExitActions>
+                        </MultiDataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Grid.Style>
+
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
 
         <ListViewItem Name="DeviceListItem"
                       AutomationProperties.Name="{Binding Device.AccessibleName}"
@@ -152,14 +181,125 @@
                       dd:DragDrop.IsDragSource="True">
                 <dd:DragDrop.DragAdornerTemplate>
                     <DataTemplate>
-                        <ctl:ImageEx x:Name="AppIcon"
-                                 Width="{DynamicResource Mutable_AppIconSize}"
-                                 Height="{DynamicResource Mutable_AppIconSize}"
-                                 SourceEx="{Binding}"
-                                 Stretch="Fill" />
+                        <!-- Win11 风格浮起卡片：8px 圆角、1px 描边、柔和投影，出现时轻微上浮 -->
+                        <Border CornerRadius="8"
+                                Padding="10,6"
+                                BorderThickness="1"
+                                Opacity="0"
+                                Background="#F2202020"
+                                Theme:Brush.Background="Light=#F9F9F9, Dark=#202020, HighContrast=Window"
+                                Theme:Brush.BorderBrush="Light=#1A000000, Dark=#1AFFFFFF, HighContrast=Text"
+                                RenderTransformOrigin="0.5,0.5">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="20" ShadowDepth="3" Direction="270" Opacity="0.18" Color="Black" />
+                            </Border.Effect>
+                            <Border.RenderTransform>
+                                <TransformGroup>
+                                    <ScaleTransform ScaleX="0.94" ScaleY="0.94" />
+                                    <TranslateTransform Y="8" />
+                                </TransformGroup>
+                            </Border.RenderTransform>
+                            <StackPanel Orientation="Horizontal">
+                                <ctl:ImageEx Width="20"
+                                             Height="20"
+                                             SourceEx="{Binding}"
+                                             Stretch="UniformToFill" />
+                                <TextBlock Text="{Binding DisplayName}"
+                                           Margin="8,0,0,0"
+                                           VerticalAlignment="Center"
+                                           FontSize="{DynamicResource Mutable_LargeWindowTextFontSize}"
+                                           MaxWidth="200"
+                                           TextTrimming="CharacterEllipsis"
+                                           Theme:Brush.Foreground="Text" />
+                            </StackPanel>
+                            <Border.Triggers>
+                                <EventTrigger RoutedEvent="Loaded">
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                             To="1" Duration="0:0:0.12" />
+                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[0].(ScaleTransform.ScaleX)"
+                                                             To="1" Duration="0:0:0.22">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseOut" />
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[0].(ScaleTransform.ScaleY)"
+                                                             To="1" Duration="0:0:0.22">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseOut" />
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[1].(TranslateTransform.Y)"
+                                                             To="0" Duration="0:0:0.22">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseOut" />
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </EventTrigger>
+                            </Border.Triggers>
+                        </Border>
                     </DataTemplate>
                 </dd:DragDrop.DragAdornerTemplate>
             </ListView>
+        </Border>
+        </Grid>
+
+        <!-- 拖放高亮：有应用被拖到本设备上且可以放到这里时出现 -->
+        <Border IsHitTestVisible="False"
+                CornerRadius="4"
+                BorderThickness="1"
+                Opacity="0"
+                Theme:Brush.BorderBrush="SystemAccent/0.85"
+                Theme:Brush.Background="SystemAccent/0.09/0.14"
+                RenderTransformOrigin="0.5,0.5">
+            <Border.RenderTransform>
+                <ScaleTransform ScaleX="0.995" ScaleY="0.995" />
+            </Border.RenderTransform>
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsDropTargetActive}" Value="True">
+                            <DataTrigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.15">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                                                         To="1" Duration="0:0:0.2">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
+                                                         To="1" Duration="0:0:0.2">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </DataTrigger.EnterActions>
+                            <DataTrigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.15" />
+                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                                                         To="0.995" Duration="0:0:0.15" />
+                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
+                                                         To="0.995" Duration="0:0:0.15" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </DataTrigger.ExitActions>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
         </Border>
     </Grid>
 </UserControl>
