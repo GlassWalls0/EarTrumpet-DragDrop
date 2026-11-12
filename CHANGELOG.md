@@ -1,5 +1,27 @@
 # Changelog
 
+## 2.3.1-dragdrop
+DragDrop 分支版本：在上游 2.3.0 基础上合入 Win11 现代化改造，并恢复"应用拖拽切换播放设备"功能。
+
+### 新增
+- 把应用卡片拖到任意播放设备卡片上即可切换该应用的输出设备，拖动过程中卡片跟随光标、目标设备高亮、来源卡片淡化
+- 拖拽使用 `gong-wpf-dragdrop` 实现，支持拖拽装饰层（DragAdorner）、目标高亮与缓动动画
+- 设置页改为 Win11 风格设置卡片布局：常规 / 音量 / 鼠标 / 外观 / 启动分类，快捷键页与关于页同步重构
+- 托盘菜单改用 Fluent 图标，未选中项与选中项视觉统一
+- 新增半透明窗口外观开关、音量步进设置、滚轮行为对齐设置、开发者选项（恢复设备、mock 图标路径修正）
+- 新增启动诊断日志（`%LOCALAPPDATA%\EarTrumpet\startup.log`），逐阶段记录启动流程
+
+### 修复
+- 修复持久化设备不可用时应用条目集体消失的问题，会话初始化增加重试，终结器增加保护
+- 托盘图标注册失败（`NIM_ADD` 返回 0）时自动换用新 GUID 重试，可从僵尸图标记录中自愈
+- 修复热键唤出后焦点不回到原窗口、以及打开时出现空白动作项的问题
+
+### 变更
+- 应用识别加固：打包应用标识、进程探测、僵尸进程异常处理
+- 移除 WinRT 投影与 CsWinRT 依赖，改用 CsWin32 源生成 + 手写 HSTRING 互操作，发布方式改为框架依赖（需系统安装 .NET 8 桌面运行时）
+- 中文本地化补全，覆盖本次新增的全部设置项与提示文案
+- 新增单元测试：本地化资源完整性校验、音量计算（共 23 项）
+
 ## x.x.x.x
 - Added support for StartAllBack multitaskbar notification area (thanks @Simplestas!)
 - Fixed various process lifecycle trigger bugs (thanks @spacechase0!)

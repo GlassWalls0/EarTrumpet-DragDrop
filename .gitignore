@@ -214,3 +214,6 @@ _pkginfo.txt
 .chocolatey/tools/Release.zip
 /artifacts/sideload
 /Tools
+
+# Local publish output (release assets are built by CI/publish, not committed)
+/dist/

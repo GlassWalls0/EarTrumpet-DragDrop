@@ -2,6 +2,14 @@
 
 [![GitHub issues](https://img.shields.io/github/issues/File-New-Project/EarTrumpet?style=flat-square)](https://github.com/File-New-Project/EarTrumpet/issues) [![GitHub forks](https://img.shields.io/github/forks/File-New-Project/EarTrumpet?style=flat-square)](https://github.com/File-New-Project/EarTrumpet/network) [![GitHub stars](https://img.shields.io/github/stars/File-New-Project/EarTrumpet?style=flat-square)](https://github.com/File-New-Project/EarTrumpet/stargazers) [![GitHub license](https://img.shields.io/github/license/File-New-Project/EarTrumpet?style=flat-square)](https://github.com/File-New-Project/EarTrumpet/blob/master/LICENSE) [![Nuget package](https://img.shields.io/chocolatey/v/eartrumpet?style=flat-square)](https://chocolatey.org/packages/eartrumpet)
 
+> **本仓库是 EarTrumpet 的个人分支（DragDrop 版）**：基于上游 2.3.0，合入 [PR #1844](https://github.com/File-New-Project/EarTrumpet/pull/1844)（Windows 11 风格设置页与托盘菜单、应用识别加固、测试），并恢复"把应用拖到设备上切换输出"的拖拽功能。
+>
+> - 发行版本 `2.3.1-dragdrop`，分支 `dragdrop-win11`，改动明细见 [CHANGELOG.md](./CHANGELOG.md)
+> - 下载：[Releases](../../releases) 中的 `EarTrumpet-2.3.1-dragdrop-win-x64.zip`
+> - 运行要求：Windows 10 1809+ / Windows 11，需安装 [.NET 8 桌面运行时](https://dotnet.microsoft.com/download/dotnet/8.0)（框架依赖发布，解压即用）
+> - 与官方 Store 版共用单实例互斥锁，二者不能同时运行；试用前请先退出 Store 版
+> - 本地构建：`dotnet publish EarTrumpet/EarTrumpet.csproj -c Release -r win-x64 --self-contained false -o dist/EarTrumpet-x64`
+
 ![EarTrumpet Screenshot](./Graphics/hero.gif)
 
 
