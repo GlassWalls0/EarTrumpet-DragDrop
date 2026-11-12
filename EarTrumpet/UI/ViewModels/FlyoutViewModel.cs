@@ -8,10 +8,11 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Threading;
+using GongSolutions.Wpf.DragDrop;
 
 namespace EarTrumpet.UI.ViewModels;
 
-public class FlyoutViewModel : BindableBase, IPopupHostViewModel, IFlyoutViewModel
+public class FlyoutViewModel : BindableBase, IPopupHostViewModel, IFlyoutViewModel, IDropTarget
 {
     public event EventHandler<object> WindowSizeInvalidated;
     public event EventHandler<object> StateChanged;
@@ -415,5 +416,23 @@ public class FlyoutViewModel : BindableBase, IPopupHostViewModel, IFlyoutViewMod
     {
         Dialog.IsVisible = false;
         e.Handled = true;
+    }
+
+    void IDropTarget.DragEnter(IDropInfo dropInfo)
+    {
+    }
+
+    void IDropTarget.DragOver(IDropInfo dropInfo)
+    {
+        DeviceViewModel.DragOver(dropInfo);
+    }
+
+    void IDropTarget.DragLeave(IDropInfo dropInfo)
+    {
+    }
+
+    void IDropTarget.Drop(IDropInfo dropInfo)
+    {
+        DeviceViewModel.Drop(dropInfo);
     }
 }

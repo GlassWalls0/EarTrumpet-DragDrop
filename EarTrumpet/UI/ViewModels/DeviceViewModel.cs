@@ -7,10 +7,11 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
+using GongSolutions.Wpf.DragDrop;
 
 namespace EarTrumpet.UI.ViewModels;
 
-public class DeviceViewModel : AudioSessionViewModel, IDeviceViewModel
+public class DeviceViewModel : AudioSessionViewModel, IDeviceViewModel, IDropTarget
 {
     public class DisplayNameComparer : IComparer<DeviceViewModel>
     {
@@ -272,4 +273,88 @@ public class DeviceViewModel : AudioSessionViewModel, IDeviceViewModel
     public void MakeDefaultDevice() => _deviceManager.Default = _device;
     public void IncrementVolume(float delta) => Volume += delta;
     public override string ToString() => AccessibleName;
+
+    void IDropTarget.DragEnter(IDropInfo dropInfo)
+    {
+    }
+
+    void IDropTarget.DragOver(IDropInfo dropInfo)
+    {
+        DragOver(dropInfo);
+    }
+
+    internal static void DragOver(IDropInfo dropInfo)
+    {
+        IAppItemViewModel sourceApp = GetDragSourceApp(dropInfo);
+        DeviceViewModel targetDevice = GetDropTargetDevice(dropInfo);
+        DeviceViewModel currentAppDevice = sourceApp?.Parent as DeviceViewModel;
+
+        if (targetDevice == null || sourceApp == null || currentAppDevice == targetDevice)
+        {
+            dropInfo.DropTargetAdorner = null;
+            dropInfo.Effects = System.Windows.DragDropEffects.None;
+        }
+        else
+        {
+            dropInfo.DropTargetAdorner = DropTargetAdorners.Highlight;
+            dropInfo.Effects = System.Windows.DragDropEffects.Move;
+        }
+    }
+
+    void IDropTarget.DragLeave(IDropInfo dropInfo)
+    {
+    }
+
+    void IDropTarget.Drop(IDropInfo dropInfo)
+    {
+        Drop(dropInfo);
+    }
+
+    internal static void Drop(IDropInfo dropInfo)
+    {
+        IAppItemViewModel sourceApp = GetDragSourceApp(dropInfo);
+        if (sourceApp == null)
+        {
+            return;
+        }
+
+        DeviceViewModel targetDevice = GetDropTargetDevice(dropInfo);
+        if (targetDevice == null)
+        {
+            return;
+        }
+
+        DeviceViewModel currentAppDevice = sourceApp.Parent as DeviceViewModel;
+        if (currentAppDevice == targetDevice)
+        {
+            return;
+        }
+
+        if (targetDevice._parent.TryGetTarget(out DeviceCollectionViewModel deviceCollectionViewModel))
+        {
+            deviceCollectionViewModel.MoveAppToDevice(sourceApp, targetDevice);
+        }
+    }
+
+    private static IAppItemViewModel GetDragSourceApp(IDropInfo dropInfo)
+    {
+        return dropInfo.Data as IAppItemViewModel;
+    }
+
+    private static DeviceViewModel GetDropTargetDevice(IDropInfo dropInfo)
+    {
+        // Drop target can be a device itself.
+        if (dropInfo.TargetItem is DeviceViewModel targetDevice)
+        {
+            return targetDevice;
+        }
+
+        // Drop target can be an app inside a device.
+        if (dropInfo.TargetItem is AppItemViewModel targetApp && targetApp.Parent is DeviceViewModel targetAppParentDevice)
+        {
+            return targetAppParentDevice;
+        }
+
+        return null;
+    }
 }

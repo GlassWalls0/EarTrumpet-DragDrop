@@ -7,6 +7,7 @@
              xmlns:resx="clr-namespace:EarTrumpet.Properties"
              xmlns:views="clr-namespace:EarTrumpet.UI.Views"
              xmlns:conv="clr-namespace:EarTrumpet.UI.Converters"
+             xmlns:dd="urn:gong-wpf-dragdrop"
              IsTabStop="False">
     <UserControl.Resources>
         <conv:VolumeToStringConverter x:Key="VolumeToStringConverter"/>
@@ -147,7 +148,18 @@
             <ListView Name="AppList"
                       Margin="{StaticResource VolumeAppListMargin}"
                       AutomationProperties.Name="{x:Static resx:Resources.AppsListAccessibleText}"
-                      ItemsSource="{Binding Device.Apps, Mode=OneWay}" />
+                      ItemsSource="{Binding Device.Apps, Mode=OneWay}"
+                      dd:DragDrop.IsDragSource="True">
+                <dd:DragDrop.DragAdornerTemplate>
+                    <DataTemplate>
+                        <ctl:ImageEx x:Name="AppIcon"
+                                 Width="{DynamicResource Mutable_AppIconSize}"
+                                 Height="{DynamicResource Mutable_AppIconSize}"
+                                 SourceEx="{Binding}"
+                                 Stretch="Fill" />
+                    </DataTemplate>
+                </dd:DragDrop.DragAdornerTemplate>
+            </ListView>
         </Border>
     </Grid>
 </UserControl>
