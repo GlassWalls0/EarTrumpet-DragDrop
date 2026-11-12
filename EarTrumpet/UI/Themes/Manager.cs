@@ -9,7 +9,6 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Threading;
-using Windows.UI.ViewManagement;
 
 namespace EarTrumpet.UI.Themes;
 
@@ -29,7 +28,8 @@ public sealed class Manager : BindableBase, INotifyPropertyChanged, IDisposable
             {
                 if (Environment.OSVersion.IsAtLeast(OSVersions.Windows11))
                 {
-                    lastAnimationsEnabledValue = new UISettings().AnimationsEnabled;
+                    // Same setting the WinRT UISettings.AnimationsEnabled exposes (Settings > Accessibility > Visual effects).
+                    lastAnimationsEnabledValue = GetClientAreaAnimationsEnabled();
                 }
                 else
                 {
@@ -39,6 +39,23 @@ public sealed class Manager : BindableBase, INotifyPropertyChanged, IDisposable
                 }
             }
             return lastAnimationsEnabledValue.Value;
+        }
+    }
+
+    private const uint SPI_GETCLIENTAREAANIMATION = 0x1042;
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SystemParametersInfo(uint uiAction, uint uiParam, out bool pvParam, uint fWinIni);
+
+    private static bool GetClientAreaAnimationsEnabled()
+    {
+        try
+        {
+            return SystemParametersInfo(SPI_GETCLIENTAREAANIMATION, 0, out var enabled, 0) && enabled;
+        }
+        catch
+        {
+            return true;
         }
     }
     public static bool IsLightTheme => SystemSettings.IsLightTheme;

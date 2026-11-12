@@ -4,6 +4,7 @@ using Windows.Win32.Media.Audio;
 
 namespace EarTrumpet.Interop.MMDeviceAPI;
 
+[ComImport]
 [Guid("2a59116d-6c4f-45e0-a74f-707e3fef9258")]
 [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
 public interface IAudioPolicyConfigFactoryVariantForDownlevel

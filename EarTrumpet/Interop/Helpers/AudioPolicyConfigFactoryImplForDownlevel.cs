@@ -2,7 +2,6 @@
 using EarTrumpet.Interop.MMDeviceAPI;
 using Windows.Win32;
 using Windows.Win32.Media.Audio;
-using WinRT;
 
 namespace EarTrumpet.Interop.Helpers;
 
@@ -12,13 +11,7 @@ internal class AudioPolicyConfigFactoryImplForDownlevel : IAudioPolicyConfigFact
 
     internal AudioPolicyConfigFactoryImplForDownlevel()
     {
-        var iid = typeof(IAudioPolicyConfigFactoryVariantForDownlevel).GUID;
-
-        var className = "Windows.Media.Internal.AudioPolicyConfig";
-        PInvoke.WindowsCreateString(className, (uint)className.Length, out var classNameString);
-        PInvoke.RoGetActivationFactory(classNameString, iid, out var factory);
-
-        _factory = (IAudioPolicyConfigFactoryVariantForDownlevel)factory;
+        _factory = AudioPolicyConfigFactoryHelper.CreateFactory<IAudioPolicyConfigFactoryVariantForDownlevel>();
     }
 
     public HRESULT ClearAllPersistedApplicationDefaultEndpoints()
@@ -29,7 +22,7 @@ internal class AudioPolicyConfigFactoryImplForDownlevel : IAudioPolicyConfigFact
     public HRESULT GetPersistedDefaultAudioEndpoint(uint processId, EDataFlow flow, ERole role, out string deviceId)
     {
         var hr = _factory.GetPersistedDefaultAudioEndpoint(processId, flow, role, out var deviceIdPtr);
-        deviceId = MarshalString.FromAbi(deviceIdPtr);
+        deviceId = AudioPolicyConfigFactoryHelper.ReadHString(deviceIdPtr);
         return hr;
     }
 

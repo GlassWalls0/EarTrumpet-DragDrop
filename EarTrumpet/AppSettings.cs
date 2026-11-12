@@ -328,7 +328,40 @@ public class AppSettings
             "JE", // Jersey
             "GG", // Guernsey
         };
-        var region = new Windows.Globalization.GeographicRegion();
-        return !europeanUnionRegions.Contains(region.CodeTwoLetter);
+        var region = GetGeoRegionCode();
+        return !europeanUnionRegions.Contains(region);
     }
+
+    /// <summary>
+    /// Two letter ISO country code of the user's geo region (same value WinRT's
+    /// GeographicRegion.CodeTwoLetter exposes), read through the Win32 geo APIs.
+    /// </summary>
+    private static string GetGeoRegionCode()
+    {
+        const int GEOCLASS_NATION = 16;
+        const int GEO_ISO2 = 4;
+
+        try
+        {
+            var geoId = GetUserGeoID(GEOCLASS_NATION);
+            if (geoId == -1)
+            {
+                return string.Empty;
+            }
+
+            var buffer = new char[3];
+            var written = GetGeoInfo(geoId, GEO_ISO2, buffer, buffer.Length, 0);
+            return written > 0 ? new string(buffer, 0, written - 1) : string.Empty;
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+    private static extern int GetUserGeoID(int geoClass);
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    private static extern int GetGeoInfo(int location, int geoType, char[] lpGeoData, int cchData, int langId);
 }
