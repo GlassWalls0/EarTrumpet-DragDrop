@@ -61,7 +61,8 @@ public sealed class ShellNotifyIcon : IDisposable
     private System.Drawing.Point _cursorPosition;
     private int _remainingTicks;
     private bool _hasAlreadyProcessedButtonUp;
-    private readonly Guid _iconIdentity;
+    private Guid _iconIdentity;
+    private readonly Func<Guid> _identityProvider;
     private bool HasAlreadyProcessedButtonUp
     {
         get
@@ -73,7 +74,7 @@ public sealed class ShellNotifyIcon : IDisposable
         set => _hasAlreadyProcessedButtonUp = value;
     }
 
-    public ShellNotifyIcon(IShellNotifyIconSource icon, Guid iconIdentity)
+    public ShellNotifyIcon(IShellNotifyIconSource icon, Guid iconIdentity, Func<Guid> identityProvider = null)
     {
         IconSource = icon;
         IconSource.Changed += (_) => Update();
@@ -81,6 +82,7 @@ public sealed class ShellNotifyIcon : IDisposable
         _window.Initialize(WndProc);
         _invalidationTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(500), DispatcherPriority.Normal, (_, __) => OnDelayedIconCheckForUpdate(), Dispatcher.CurrentDispatcher);
         _iconIdentity = iconIdentity;
+        _identityProvider = identityProvider;
 
         Themes.Manager.Current.PropertyChanged += (_, __) => ScheduleDelayedIconInvalidation();
         Microsoft.Win32.SystemEvents.DisplaySettingsChanged += (_, __) => ScheduleDelayedIconInvalidation();
@@ -141,6 +143,18 @@ public sealed class ShellNotifyIcon : IDisposable
                 if (!PInvoke.Shell_NotifyIcon(NOTIFY_ICON_MESSAGE.NIM_ADD, data))
                 {
                     Trace.WriteLine($"ShellNotifyIcon Update NIM_ADD Failed {(uint)Marshal.GetLastWin32Error()}");
+                    // The shell can keep a dead registration for this GUID (e.g. after a crash),
+                    // which makes every NIM_ADD with the same GUID fail. Retry once with a fresh identity.
+                    if (_identityProvider != null)
+                    {
+                        _iconIdentity = _identityProvider();
+                        Trace.WriteLine($"ShellNotifyIcon retrying NIM_ADD with fresh identity {_iconIdentity}");
+                        data = MakeData();
+                        if (!PInvoke.Shell_NotifyIcon(NOTIFY_ICON_MESSAGE.NIM_ADD, data))
+                        {
+                            Trace.WriteLine($"ShellNotifyIcon Update NIM_ADD Failed again {(uint)Marshal.GetLastWin32Error()}");
+                        }
+                    }
                 }
 
                 _isCreated = true;

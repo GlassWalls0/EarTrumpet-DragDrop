@@ -67,8 +67,43 @@ public sealed partial class App : IDisposable
         get; private set;
     }
 
+    private static TextWriterTraceListener s_logListener;
+    private static bool s_logCreated;
+
+    private void InitializeDiagnosticLog()
+    {
+        try
+        {
+            if (!s_logCreated)
+            {
+                var dir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EarTrumpet");
+                System.IO.Directory.CreateDirectory(dir);
+                var writer = new System.IO.StreamWriter(System.IO.Path.Combine(dir, "startup.log"), append: true) { AutoFlush = true };
+                s_logListener = new TextWriterTraceListener(writer);
+                s_logCreated = true;
+                Trace.Listeners.Add(s_logListener);
+                Trace.WriteLine($"=== startup {DateTime.Now:yyyy-MM-dd HH:mm:ss} pid={Environment.ProcessId} ===");
+                AppDomain.CurrentDomain.UnhandledException += (_, args) =>
+                    Trace.WriteLine($"UNHANDLED: {args.ExceptionObject}");
+                DispatcherUnhandledException += (_, args) =>
+                {
+                    Trace.WriteLine($"DISPATCHER UNHANDLED: {args.Exception}");
+                    args.Handled = true;
+                };
+            }
+            else if (!Trace.Listeners.Contains(s_logListener))
+            {
+                // ErrorReporter clears the trace listeners in its constructor.
+                Trace.Listeners.Add(s_logListener);
+            }
+        }
+        catch { }
+    }
+
     private void OnAppStartup(object sender, StartupEventArgs e)
     {
+        InitializeDiagnosticLog();
+        Trace.WriteLine("OnAppStartup begin");
         // es-MX, es-AR, ... have no satellite assembly of their own: use the Spanish (Spain) strings instead of English.
         var ui = System.Globalization.CultureInfo.CurrentUICulture;
         if (ui.TwoLetterISOLanguageName == "es" && ui.Name != "es-ES")
@@ -89,9 +124,11 @@ public sealed partial class App : IDisposable
         Settings = new AppSettings();
         DataModel.SystemSettings.ForceOpaque = !Settings.UseTranslucentWindows;
         _errorReporter = new ErrorReporter(Settings);
+        InitializeDiagnosticLog(); // re-attach, ErrorReporter clears listeners
 
         if (SingleInstanceAppMutex.TakeExclusivity())
         {
+            Trace.WriteLine("TakeExclusivity: acquired");
             Exit += (_, __) => SingleInstanceAppMutex.ReleaseExclusivity();
 
             try
@@ -113,13 +150,27 @@ public sealed partial class App : IDisposable
 
     private void ContinueStartup()
     {
+        Trace.WriteLine("ContinueStartup begin");
         ((UI.Themes.Manager)Resources["ThemeManager"]).Load();
+        Trace.WriteLine("ContinueStartup: themes loaded");
 
         var deviceManager = WindowsAudioFactory.Create(AudioDeviceKind.Playback);
-        deviceManager.Loaded += (_, __) => CompleteStartup();
+        deviceManager.Loaded += (_, __) =>
+        {
+            Trace.WriteLine("deviceManager.Loaded fired -> CompleteStartup");
+            CompleteStartup();
+        };
         CollectionViewModel = new DeviceCollectionViewModel(deviceManager, Settings);
+        Trace.WriteLine("ContinueStartup: collection vm created");
 
-        _trayIcon = new ShellNotifyIcon(new TaskbarIconSource(CollectionViewModel, Settings), Settings.TrayIconIdentity);
+        _trayIcon = new ShellNotifyIcon(new TaskbarIconSource(CollectionViewModel, Settings), Settings.TrayIconIdentity,
+            () =>
+            {
+                var fresh = Guid.NewGuid();
+                Settings.TrayIconIdentity = fresh;
+                return fresh;
+            });
+        Trace.WriteLine("ContinueStartup: tray icon object created");
         Exit += (_, __) => _trayIcon.IsVisible = false;
         CollectionViewModel.TrayPropertyChanged += () => UpdateTrayTooltip();
 
@@ -128,6 +179,7 @@ public sealed partial class App : IDisposable
         // Initialize the FlyoutWindow last because its Show/Hide cycle will pump messages, causing UI frames
         // to be executed, breaking the assumption that startup is complete.
         FlyoutWindow.Initialize();
+        Trace.WriteLine("ContinueStartup end (waiting for deviceManager.Loaded)");
 
         // listen for user session change
         // When user come back after user switch, do some workaround for issue of losing audio sessions
@@ -147,13 +199,16 @@ public sealed partial class App : IDisposable
 
     private void CompleteStartup()
     {
+        Trace.WriteLine("CompleteStartup begin");
         AddonManager.Load(shouldLoadInternalAddons: HasDevIdentity);
+        Trace.WriteLine("CompleteStartup: addons loaded");
         Exit += (_, __) => AddonManager.Shutdown();
 #if DEBUG
         DebugHelpers.Add();
 #endif
         _mixerWindow = new WindowHolder(CreateMixerExperience);
         _settingsWindow = new WindowHolder(CreateSettingsExperience);
+        Trace.WriteLine("CompleteStartup: window holders created");
 
         Settings.FlyoutHotkeyTyped += OnFlyoutHotkeyTyped;
         Settings.MixerHotkeyTyped += () => _mixerWindow.OpenOrClose();
@@ -161,6 +216,7 @@ public sealed partial class App : IDisposable
         Settings.AbsoluteVolumeUpHotkeyTyped += AbsoluteVolumeIncrement;
         Settings.AbsoluteVolumeDownHotkeyTyped += AbsoluteVolumeDecrement;
         Settings.RegisterHotkeys();
+        Trace.WriteLine("CompleteStartup: hotkeys registered");
         Settings.UseLogarithmicVolumeChanged += (_, __) => UpdateTrayTooltip();
 
         _trayIcon.PrimaryInvoke += (_, type) =>
@@ -172,10 +228,13 @@ public sealed partial class App : IDisposable
         _trayIcon.TertiaryInvoke += (_, __) => CollectionViewModel.Default?.ToggleMute.Execute(null);
         _trayIcon.Scrolled += TrayIconScrolled;
         _trayIcon.SetTooltip(CollectionViewModel.GetTrayToolTip());
+        Trace.WriteLine("CompleteStartup: setting tray icon visible");
         _trayIcon.IsVisible = true;
+        Trace.WriteLine("CompleteStartup: tray icon visible done");
 
         DisplayFirstRunExperience();
         ShowFullMixerWindowIfConfigured();
+        Trace.WriteLine("CompleteStartup end");
     }
 
     // Window that had focus when the flyout hotkey opened the flyout, so closing it can hand focus back (#1751).

@@ -242,6 +242,7 @@ public class AppSettings
             }
             return id;
         }
+        set => _settings.Set("TrayIconId", value);
     }
 
     private static bool IsTelemetryEnabledByDefault()
